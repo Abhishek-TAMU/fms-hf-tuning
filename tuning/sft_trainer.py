@@ -315,6 +315,15 @@ def train(
             model, train_args, modifiable_args=(peft_config,)
         )
 
+    #########TOTCH.COMPILE##############
+    train_args.torch_compile = True
+    train_args.torch_compile_backend = "inductor"
+    train_args.torch_compile_mode = "default"
+
+    # print("train_args: %s", train_args)
+    logger.debug("train_args: %s", train_args)
+    # ##################################
+
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
