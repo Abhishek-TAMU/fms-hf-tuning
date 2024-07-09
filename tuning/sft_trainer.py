@@ -63,6 +63,8 @@ from tuning.utils.error_logging import (
     write_termination_log,
 )
 
+logger = logging.get_logger("transformers")
+
 
 def train(
     model_args: configs.ModelArguments,
@@ -108,7 +110,7 @@ def train(
             fused_lora and fast_kernels must used together (may change in future). \
     """
 
-    logger = logging.get_logger("sft_trainer")
+    # logger = logging.get_logger("sft_trainer")
 
     # Validate parameters
     if (not isinstance(train_args.num_train_epochs, (float, int))) or (
@@ -324,6 +326,7 @@ def train(
 
     # print("train_args: %s", train_args)
     logger.debug("train_args: %s", train_args)
+    logger.info("train_args: %s", train_args)
     # ##################################
 
     trainer = SFTTrainer(
@@ -490,7 +493,6 @@ def parse_arguments(parser, json_config=None):
 
 def main(**kwargs):  # pylint: disable=unused-argument
     os.environ["TRANSFORMERS_VERBOSITY"] = "debug"
-    logger = logging.get_logger("transformers")
     # logger = logging.get_logger("__main__")
 
     parser = get_parser()
