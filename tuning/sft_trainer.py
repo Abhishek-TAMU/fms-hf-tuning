@@ -18,6 +18,7 @@ import json
 import sys
 import time
 import traceback
+import os
 
 # Third Party
 from huggingface_hub.utils._validators import HFValidationError
@@ -488,7 +489,9 @@ def parse_arguments(parser, json_config=None):
 
 
 def main(**kwargs):  # pylint: disable=unused-argument
-    logger = logging.get_logger("__main__")
+    os.environ["TRANSFORMERS_VERBOSITY"] = "debug"
+    logger = logging.get_logger("transformers")
+    # logger = logging.get_logger("__main__")
 
     parser = get_parser()
     job_config = get_json_config()
