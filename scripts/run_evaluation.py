@@ -174,12 +174,6 @@ def get_prediction_results(
         # Format the alpaca example
         formatted_datum = get_formatted_example(datum, use_instruction)
 
-        ##################
-        # ADD TORCH COMPILE
-        model = torch.compile(model)
-
-        ##################
-
         # Run the formatted text through the model, and only save the newly generated text strings
         prediction = model.run(
             formatted_datum["input"],
