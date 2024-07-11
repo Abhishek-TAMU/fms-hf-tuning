@@ -19,6 +19,8 @@ import sys
 import time
 import traceback
 import os
+import torch._dynamo
+    
 
 # Third Party
 from huggingface_hub.utils._validators import HFValidationError
@@ -64,7 +66,7 @@ from tuning.utils.error_logging import (
 )
 
 logger = logging.get_logger("transformers")
-
+torch._dynamo.config.suppress_errors = True
 
 def train(
     model_args: configs.ModelArguments,
