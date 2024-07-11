@@ -29,7 +29,7 @@ ARG USER_UID
 
 RUN dnf remove -y --disableplugin=subscription-manager \
         subscription-manager \
-    && dnf install -y python${PYTHON_VERSION} procps \
+    && dnf install -y python${PYTHON_VERSION} procps make automake gcc gcc-c++ \
     && ln -s /usr/bin/python${PYTHON_VERSION} /bin/python \
     && python -m ensurepip --upgrade \
     && python -m pip install --upgrade pip \
