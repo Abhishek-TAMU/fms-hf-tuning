@@ -319,11 +319,11 @@ def train(
         )
 
     #########TOTCH.COMPILE##############
-    train_args.torch_compile = True
-    train_args.torch_compile_backend = "inductor"
-    train_args.torch_compile_mode = "default"
-    train_args.include_tokens_per_second = True
-    train_args.save_total_limit = 3
+    # train_args.torch_compile = True
+    # train_args.torch_compile_backend = "inductor"
+    # train_args.torch_compile_mode = "default"
+    # train_args.include_tokens_per_second = True
+    # train_args.save_total_limit = 3
 
     # print("train_args: %s", train_args)
     logger.debug("train_args: %s", train_args)
