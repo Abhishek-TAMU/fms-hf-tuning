@@ -29,7 +29,7 @@ ARG USER_UID
 
 RUN dnf remove -y --disableplugin=subscription-manager \
         subscription-manager \
-    && dnf install -y python${PYTHON_VERSION} procps make automake gcc gcc-c++ \
+    && dnf install -y python${PYTHON_VERSION} procps git make automake gcc gcc-c++ \
     && ln -s /usr/bin/python${PYTHON_VERSION} /bin/python \
     && python -m ensurepip --upgrade \
     && python -m pip install --upgrade pip \
@@ -46,8 +46,7 @@ RUN useradd -u $USER_UID ${USER} -m -g 0 --system && \
 FROM base as release-base
 
 # Removes the python3.9 code to eliminate possible CVEs.  Also removes dnf
-RUN rpm -e $(dnf repoquery python3-* -q --installed) dnf python3 yum crypto-policies-scripts
-
+# RUN rpm -e $(dnf repoquery python3-* -q --installed) python3 crypto-policies-scripts
 
 ## CUDA Base ###################################################################
 FROM base as cuda-base
