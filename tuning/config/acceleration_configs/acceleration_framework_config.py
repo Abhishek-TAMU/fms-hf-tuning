@@ -172,14 +172,27 @@ class AccelerationFrameworkConfig:
                 NamedTemporaryFile,
             )
 
-            with NamedTemporaryFile("w") as f:
-                self.to_yaml(f.name)
-                return AccelerationFramework(f.name)
+            try:
+                with NamedTemporaryFile("w") as f:
+                    self.to_yaml(f.name)
+                    return AccelerationFramework(f.name)
+            except ValueError as e:
+                (msg,) = e.args
+
+                # AcceleratorFramework raises ValueError if it
+                # fails to configure any plugin
+                if self.is_empty() and msg.startswith("No plugins could be configured"):
+                    # in the case when the error was thrown when
+                    # the acceleration framework config was empty
+                    # then this is expected.
+                    return None
+
+                raise e
         else:
             if not self.is_empty():
                 raise ValueError(
                     "No acceleration framework package found. To use, first "
-                    "ensure that 'pip install -e.[fms-accel]' is done first to "
+                    "ensure that 'pip install fms-hf-tuning[fms-accel]' is done first to "
                     "obtain the acceleration framework dependency. Additional "
                     "acceleration plugins make be required depending on the requsted "
                     "acceleration. See README.md for instructions."
@@ -244,7 +257,7 @@ class AccelerationFrameworkConfig:
                         "to be installed. Please do:\n"
                         + "\n".join(
                             [
-                                "- python -m fms_acceleration install "
+                                "- python -m fms_acceleration.cli install "
                                 f"{AccelerationFrameworkConfig.PACKAGE_PREFIX + x}"
                                 for x in annotate.required_packages
                             ]

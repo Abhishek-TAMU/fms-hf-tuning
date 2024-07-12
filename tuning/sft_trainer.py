@@ -14,6 +14,7 @@
 
 # Standard
 from typing import Dict, List, Optional, Union
+import dataclasses
 import json
 import sys
 import time
@@ -36,7 +37,7 @@ from transformers import (
     TrainerCallback,
 )
 from transformers.utils import is_accelerate_available, logging
-from trl import DataCollatorForCompletionOnlyLM, SFTTrainer
+from trl import SFTConfig, SFTTrainer
 import datasets
 import fire
 import transformers
@@ -64,6 +65,7 @@ from tuning.utils.error_logging import (
     USER_ERROR_EXIT_CODE,
     write_termination_log,
 )
+from tuning.utils.preprocessing_utils import get_data_collator, validate_data_args
 
 logger = logging.get_logger("transformers")
 torch._dynamo.config.suppress_errors = True
@@ -199,14 +201,6 @@ def train(
             }
         )
 
-    # TODO: near term - how response template ids are parsed out needs to be cleaned.
-    # The [2:] here applies if response template has \n prefix, it is needed to strip \n,
-    # otherwise template is not found. We will create issue to clean this out after we discuss
-    # data formats and collators we will support.
-    response_template_ids = tokenizer.encode(
-        data_args.response_template, add_special_tokens=False
-    )[2:]
-
     max_seq_length = min(train_args.max_seq_length, tokenizer.model_max_length)
     logger.info("Max sequence length is %s", max_seq_length)
     if train_args.max_seq_length > tokenizer.model_max_length:
@@ -239,6 +233,7 @@ def train(
         special_tokens_dict=special_tokens_dict,
         tokenizer=tokenizer,
         model=model,
+        multiple_of=model_args.embedding_size_multiple_of,
     )
 
     # Configure the collator and validate args related to packing prior to formatting the dataset
@@ -248,31 +243,14 @@ def train(
         packing = True
     else:
         logger.info("Packing is set to False")
-        if data_args.response_template is None:
-            # TODO: Fix this, currently unreachable due to crashing in batch encoding tokenization
-            # We should do this validation up front, then do the encoding, then handle the collator
-            raise ValueError("Response template is None, needs to be set for training")
-        data_collator = DataCollatorForCompletionOnlyLM(
-            response_template_ids,
-            tokenizer=tokenizer,
-            ignore_index=configs.IGNORE_INDEX,
-        )
         packing = False
 
-    # Currently we support formatted datasets with single sequence instances.
-    if not (data_args.dataset_text_field or data_args.data_formatter_template):
-        raise ValueError(
-            "dataset_text_field and data_formatter_template are None. \
-                            One of them needs to be set for training"
-        )
-    # Only one of dataset_text_field or data_formatter_template should be set.
-    if data_args.dataset_text_field and data_args.data_formatter_template:
-        raise ValueError(
-            "dataset_text_field and data_formatter_template are both set,\
-                but are mutually exclusive options"
-        )
+    # Validate if data args are set properly
+    validate_data_args(data_args, packing)
+    data_collator = get_data_collator(packing, data_args.response_template, tokenizer)
 
     # load the data by parsing JSON
+    ### TODO: all the jSON file formatting will be moved to a separate function
     data_files = {"train": data_args.training_data_path}
     if data_args.validation_data_path:
         data_files["validation"] = data_args.validation_data_path
@@ -314,11 +292,13 @@ def train(
         logger.info(
             "Validation dataset length is %s", len(formatted_validation_dataset)
         )
+    ### JSON file formatting ends here
 
     if framework is not None and framework.requires_agumentation:
         model, (peft_config,) = framework.augmentation(
             model, train_args, modifiable_args=(peft_config,)
         )
+
 
     #########TOTCH.COMPILE##############
     # train_args.torch_compile = True
@@ -331,6 +311,24 @@ def train(
     logger.debug("train_args: %s", train_args)
     logger.info("train_args: %s", train_args)
     # ##################################
+    
+    # HACK - The SFT Trainer has internal validation which inspects the name of the class
+    # being used for the HF training args; if it's a TrainingArguments class, which is
+    # presumably from transformers, it tries to build it into an SFT Config.
+    #
+    # This is unfortunately a naming collision with one of our own classes, which has extra
+    # fields, and therefore can't be used to initialize the SFT Config. For now, to sidestep
+    # this validation, we just drop the things that aren't part of the SFT Config and build one
+    # from our object directly. In the future, we should consider renaming this class and / or
+    # not adding things that are not directly used by the trainer instance to it.
+    transformer_train_arg_fields = [x.name for x in dataclasses.fields(SFTConfig)]
+    transformer_kwargs = {
+        k: v
+        for k, v in train_args.to_dict().items()
+        if k in transformer_train_arg_fields
+    }
+    training_args = SFTConfig(**transformer_kwargs)
+
 
     trainer = SFTTrainer(
         model=model,
@@ -340,7 +338,7 @@ def train(
         packing=packing,
         data_collator=data_collator,
         dataset_text_field=data_args.dataset_text_field,
-        args=train_args,
+        args=training_args,
         max_seq_length=max_seq_length,
         callbacks=trainer_callbacks,
         peft_config=peft_config,
