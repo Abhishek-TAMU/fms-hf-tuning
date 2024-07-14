@@ -2,9 +2,9 @@ controller_metrics:
   - name: loss
     class: Loss
 controllers:
-  - name: loss_controller_wrong_os_rule
+  - name: loss_controller_unavailable_metric
     triggers:
-      - on_log
-    rule: "2+2"
+      - on_step_end
+    rule: loss < 1.0
     operations:
       - hfcontrols.should_training_stop
