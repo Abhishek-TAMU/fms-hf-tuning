@@ -205,11 +205,11 @@ class TunedCausalLM:
                         else None,
                         torch_dtype=torch.bfloat16 if use_flash_attn else None,
                     )
-                    ##################
-                    # ADD TORCH COMPILE
-                    model = torch.compile(model)
+                    # ##################
+                    # # ADD TORCH COMPILE
+                    # model = torch.compile(model)
 
-                    ##################
+                    # ##################
 
                 except (OSError, ValueError) as e:
                     print("Failed to initialize checkpoint model!")
@@ -222,11 +222,11 @@ class TunedCausalLM:
                 attn_implementation="flash_attention_2" if use_flash_attn else None,
                 torch_dtype=torch.bfloat16 if use_flash_attn else None,
             )
-            ##################
-            # ADD TORCH COMPILE
-            model = torch.compile(model)
+            # ##################
+            # # ADD TORCH COMPILE
+            # model = torch.compile(model)
 
-            ##################
+            # ##################
 
         device = "cuda" if torch.cuda.is_available() else None
         print(f"Inferred device: {device}")

@@ -23,6 +23,13 @@ ARG WHEEL_VERSION=""
 ## Base Layer ##################################################################
 FROM registry.access.redhat.com/ubi9/ubi:${BASE_UBI_IMAGE_TAG} as base
 
+# Install the latest kernel
+RUN yum -y update kernel && \
+    yum clean all
+
+RUN yum install "kernel-devel-uname-r == $(uname -r)"
+RUN yum install "kernel-headers-uname-r == $(uname -r)"
+
 ARG PYTHON_VERSION
 ARG USER
 ARG USER_UID

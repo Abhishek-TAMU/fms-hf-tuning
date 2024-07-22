@@ -21,6 +21,9 @@ import time
 import traceback
 import os
 import torch._dynamo
+os.environ["TOKENIZERS_PARALLELISM"] = "True"
+os.environ["TORCH_COMPILE_DEBUG"] = "True"
+os.environ["TORCH_LOGS"] = "+dynamo"
 
 # Third Party
 from huggingface_hub.utils._validators import HFValidationError
