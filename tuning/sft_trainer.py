@@ -23,7 +23,7 @@ import os
 import torch._dynamo
 os.environ["TOKENIZERS_PARALLELISM"] = "True"
 os.environ["TORCH_COMPILE_DEBUG"] = "True"
-os.environ["TORCH_LOGS"] = "+dynamo"
+os.environ["TORCH_LOGS"] = "+dynamo,+aot,+inductor"
 
 # Third Party
 from huggingface_hub.utils._validators import HFValidationError
@@ -71,6 +71,8 @@ from tuning.utils.preprocessing_utils import get_data_collator, validate_data_ar
 
 logger = logging.get_logger("transformers")
 torch._dynamo.config.suppress_errors = True
+torch._dynamo.config.verbose = True  # Enable verbose logging for more details
+# torch._dynamo.config.disable = True  # Disable dynamo
 
 def train(
     model_args: configs.ModelArguments,
