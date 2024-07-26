@@ -21,9 +21,28 @@ import time
 import traceback
 import os
 import torch._dynamo
+import numpy as np
+import random
 os.environ["TOKENIZERS_PARALLELISM"] = "True"
 os.environ["TORCH_COMPILE_DEBUG"] = "True"
-os.environ["TORCH_LOGS"] = "+dynamo,+aot,+inductor,graph_breaks,recompiles"
+os.environ["TORCH_LOGS"] = "dynamo,aot,inductor,graph_breaks,recompiles"
+
+from torch._inductor import config
+from torch._dynamo import config as cfg
+config.fallback_random = True
+
+# cfg.repro_tolerance = 1e+100000
+
+# seed = 42
+# random.seed(seed)
+# np.random.seed(seed)
+# torch.manual_seed(seed)
+# if torch.cuda.is_available():
+#     torch.cuda.manual_seed(seed)
+#     torch.cuda.manual_seed_all(seed)
+
+# torch.backends.cudnn.deterministic = True
+# torch.backends.cudnn.benchmark = False
 
 # Third Party
 from huggingface_hub.utils._validators import HFValidationError
@@ -353,6 +372,7 @@ def train(
     training_args = SFTConfig(**transformer_kwargs)
 
 
+    # model = torch.compile(model)
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
