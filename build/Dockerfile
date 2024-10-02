@@ -137,9 +137,14 @@ RUN --mount=type=cache,target=/home/${USER}/.cache/pip,uid=${USER_UID} \
     python -m pip install --user "$(head bdist_name)" && \
     python -m pip install --user "$(head bdist_name)[flash-attn]"
 
+# fms_acceleration_peft = PEFT-training, e.g., 4bit QLoRA
+# fms_acceleration_foak = Fused LoRA and triton kernels
+# fms_acceleration_aadp = Padding-Free Flash Attention Computation
 RUN if [[ "${ENABLE_FMS_ACCELERATION}" == "true" ]]; then \
         python -m pip install --user "$(head bdist_name)[fms-accel]"; \
         python -m fms_acceleration.cli install fms_acceleration_peft; \
+        python -m fms_acceleration.cli install fms_acceleration_foak; \
+        python -m fms_acceleration.cli install fms_acceleration_aadp; \
     fi
 
 RUN if [[ "${ENABLE_AIM}" == "true" ]]; then \
@@ -183,6 +188,7 @@ ENV SET_NUM_PROCESSES_TO_NUM_GPUS="True"
 WORKDIR /app
 USER ${USER}
 COPY --from=python-installations /home/${USER}/.local /home/${USER}/.local
+COPY --from=cuda-devel /usr/local /home/${USER}/local
 ENV PYTHONPATH="/home/${USER}/.local/lib/python${PYTHON_VERSION}/site-packages"
 
 CMD [ "python", "/app/accelerate_launch.py" ]

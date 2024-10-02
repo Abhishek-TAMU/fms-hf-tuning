@@ -334,6 +334,7 @@ def test_parse_arguments(job_config):
         _,
         _,
         _,
+        _,
     ) = sft_trainer.parse_arguments(parser, job_config_copy)
     assert str(model_args.torch_dtype) == "torch.bfloat16"
     assert data_args.dataset_text_field == "output"
@@ -347,9 +348,19 @@ def test_parse_arguments_defaults(job_config):
     assert "torch_dtype" not in job_config_defaults
     assert job_config_defaults["use_flash_attn"] is False
     assert "save_strategy" not in job_config_defaults
-    model_args, _, training_args, _, _, _, _, _, _, _ = sft_trainer.parse_arguments(
-        parser, job_config_defaults
-    )
+    (
+        model_args,
+        _,
+        training_args,
+        _,
+        _,
+        _,
+        _,
+        _,
+        _,
+        _,
+        _,
+    ) = sft_trainer.parse_arguments(parser, job_config_defaults)
     assert str(model_args.torch_dtype) == "torch.bfloat16"
     assert model_args.use_flash_attn is False
     assert training_args.save_strategy.value == "epoch"
@@ -359,14 +370,14 @@ def test_parse_arguments_peft_method(job_config):
     parser = sft_trainer.get_parser()
     job_config_pt = copy.deepcopy(job_config)
     job_config_pt["peft_method"] = "pt"
-    _, _, _, _, tune_config, _, _, _, _, _ = sft_trainer.parse_arguments(
+    _, _, _, _, tune_config, _, _, _, _, _, _ = sft_trainer.parse_arguments(
         parser, job_config_pt
     )
     assert isinstance(tune_config, peft_config.PromptTuningConfig)
 
     job_config_lora = copy.deepcopy(job_config)
     job_config_lora["peft_method"] = "lora"
-    _, _, _, _, tune_config, _, _, _, _, _ = sft_trainer.parse_arguments(
+    _, _, _, _, tune_config, _, _, _, _, _, _ = sft_trainer.parse_arguments(
         parser, job_config_lora
     )
     assert isinstance(tune_config, peft_config.LoraConfig)
@@ -650,6 +661,8 @@ def test_successful_lora_target_modules_default_from_main():
         sft_trainer.main()
 
         _validate_training(tempdir)
+        # Calling LoRA tuning from the main results in 'added_tokens_info.json'
+        assert "added_tokens_info.json" in os.listdir(tempdir)
         checkpoint_path = _get_checkpoint_path(tempdir)
         adapter_config = _get_adapter_config(checkpoint_path)
         _validate_adapter_config(adapter_config, "LORA")
@@ -691,7 +704,7 @@ def test_run_causallm_ft_save_with_save_model_dir_save_strategy_no():
         save_model_args.save_strategy = "no"
         save_model_args.output_dir = tempdir
 
-        trainer = sft_trainer.train(MODEL_ARGS, DATA_ARGS, save_model_args, None)
+        trainer, _ = sft_trainer.train(MODEL_ARGS, DATA_ARGS, save_model_args, None)
         logs_path = os.path.join(
             tempdir, FileLoggingTrackerConfig.training_logs_filename
         )

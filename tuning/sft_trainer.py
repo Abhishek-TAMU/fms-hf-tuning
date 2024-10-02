@@ -44,6 +44,7 @@ import transformers
 from tuning.config import configs, peft_config
 from tuning.config.acceleration_configs import (
     AccelerationFrameworkConfig,
+    AttentionAndDistributedPackingConfig,
     FusedOpsAndKernelsConfig,
     QuantizedLoraConfig,
 )
@@ -87,7 +88,10 @@ def train(
     exp_metadata: Optional[Dict] = None,
     quantized_lora_config: Optional[QuantizedLoraConfig] = None,
     fusedops_kernels_config: Optional[FusedOpsAndKernelsConfig] = None,
-):
+    attention_and_distributed_packing_config: Optional[
+        AttentionAndDistributedPackingConfig
+    ] = None,
+) -> tuple[SFTTrainer, dict]:
     """Call the SFTTrainer
 
     Args:
@@ -114,6 +118,11 @@ def train(
         fusedops_kernels_config: tuning.config.acceleration_configs.FusedOpsAndKernelsConfig \
             Should be used in combination with quantized_lora_config. Also currently 
             fused_lora and fast_kernels must used together (may change in future). \
+        attention_and_distributed_packing_config: Used for padding-free attention and multipack.
+
+    Returns:
+        Tuple: Instance of SFTTrainer , some metadata in a dict
+            Metadata contains information on number of added tokens while tuning.
     """
 
     train_args, logger = set_log_level(train_args, "sft_trainer_train")
@@ -127,6 +136,24 @@ def train(
         train_args.gradient_accumulation_steps <= 0
     ):
         raise ValueError("gradient_accumulation_steps has to be an integer >= 1")
+
+    if (
+        attention_and_distributed_packing_config is not None
+        and attention_and_distributed_packing_config.padding_free is not None
+    ):
+        if model_args.use_flash_attn is False:
+            raise ValueError(
+                "`--padding_free` argument was called without enabling flash attention, "
+                "ensure `use_flash_attn = True` to use padding-free flash attention"
+            )
+
+        if train_args.packing:
+            # We prevent Trainer from performing packing with padding_free.
+            # Since the plugin computes attention efficiently without padding.
+            raise ValueError(
+                "`--padding_free` argument was called with `packing=True`, "
+                "Trainer should not perform packing when using `--padding_free`"
+            )
 
     task_type = "CAUSAL_LM"
     additional_metrics = {}
@@ -179,7 +206,9 @@ def train(
             trainer_callbacks.append(cb)
 
     framework = AccelerationFrameworkConfig.from_dataclasses(
-        quantized_lora_config, fusedops_kernels_config
+        quantized_lora_config,
+        fusedops_kernels_config,
+        attention_and_distributed_packing_config,
     ).get_framework()
 
     model_loader = AutoModelForCausalLM.from_pretrained
@@ -218,23 +247,16 @@ def train(
     )
 
     # Add special tokens only when a custom tokenizer is not passed
+    special_tokens_dict = {}
     if not model_args.tokenizer_name_or_path:
         # TODO: understand if we need to hardcode these here or just use defaults in model
         if isinstance(tokenizer, (LlamaTokenizer, LlamaTokenizerFast)):
-            tokenizer.add_special_tokens(
-                {
-                    "bos_token": "<s>",
-                    "eos_token": "</s>",
-                    "unk_token": "<unk>",
-                    "pad_token": "<pad>",
-                }
-            )
+            special_tokens_dict["bos_token"] = "<s>"
+            special_tokens_dict["eos_token"] = "</s>"
+            special_tokens_dict["unk_token"] = "<unk>"
+            special_tokens_dict["pad_token"] = "<pad>"
         elif isinstance(tokenizer, (GPT2Tokenizer, GPTNeoXTokenizerFast)):
-            tokenizer.add_special_tokens(
-                {
-                    "pad_token": "<pad>",
-                }
-            )
+            special_tokens_dict["pad_token"] = "<pad>"
 
     max_seq_length = min(train_args.max_seq_length, tokenizer.model_max_length)
     logger.info("Max sequence length is %s", max_seq_length)
@@ -248,7 +270,6 @@ def train(
         )
 
     # add special tokens only when a custom tokenizer is not passed
-    special_tokens_dict = {}
     if not model_args.tokenizer_name_or_path:
         # TODO: we need to change this, perhaps follow what open instruct does?
         if tokenizer.pad_token is None:
@@ -274,7 +295,7 @@ def train(
 
     # TODO: lower priority but understand if resizing impacts inference quality and why its needed.
     # It makes sense if we manipulate tokenizer that we also save it and provide it to inference.
-    num_added_tokens = tokenizer_data_utils.tokenizer_and_embedding_resize(
+    added_tokens_dict = tokenizer_data_utils.tokenizer_and_embedding_resize(
         special_tokens_dict=special_tokens_dict,
         tokenizer=tokenizer,
         model=model,
@@ -370,7 +391,7 @@ def train(
         )
 
     if framework is not None:
-        accelerator = None if not is_accelerate_available else trainer.accelerator
+        accelerator = None if not is_accelerate_available() else trainer.accelerator
 
         # ready for train may produce additional callbacks for the trainer
         for x in framework.get_callbacks_and_ready_for_train(model, accelerator):
@@ -394,8 +415,9 @@ def train(
         )
 
     trainer.train(resume_from_checkpoint)
-
-    return trainer, num_added_tokens
+    additional_metadata = {}
+    additional_metadata["added_tokens_info"] = added_tokens_dict
+    return trainer, additional_metadata
 
 
 def save(path: str, trainer: SFTTrainer, log_level="WARNING"):
@@ -437,6 +459,7 @@ def get_parser():
             AimConfig,
             QuantizedLoraConfig,
             FusedOpsAndKernelsConfig,
+            AttentionAndDistributedPackingConfig,
         )
     )
     parser.add_argument(
@@ -445,6 +468,7 @@ def get_parser():
         choices=["pt", "lora", None, "none"],
         default="none",
     )
+
     parser.add_argument(
         "--post_process_vllm",
         type=bool,
@@ -490,6 +514,8 @@ def parse_arguments(parser, json_config=None):
             Configuration for quantized LoRA (a form of PEFT).
         FusedOpsAndKernelsConfig
             Configuration for fused operations and kernels.
+        AttentionAndDistributedPackingConfig
+            Configuration for padding free and packing.
         dict[str, str]
             Extra AIM metadata.
     """
@@ -505,6 +531,7 @@ def parse_arguments(parser, json_config=None):
             aim_config,
             quantized_lora_config,
             fusedops_kernels_config,
+            attention_and_distributed_packing_config,
         ) = parser.parse_dict(json_config, allow_extra_keys=True)
         peft_method = json_config.get("peft_method")
         exp_metadata = json_config.get("exp_metadata")
@@ -521,6 +548,7 @@ def parse_arguments(parser, json_config=None):
             aim_config,
             quantized_lora_config,
             fusedops_kernels_config,
+            attention_and_distributed_packing_config,
             additional,
             _,
         ) = parser.parse_args_into_dataclasses(return_remaining_strings=True)
@@ -546,6 +574,7 @@ def parse_arguments(parser, json_config=None):
         aim_config,
         quantized_lora_config,
         fusedops_kernels_config,
+        attention_and_distributed_packing_config,
         exp_metadata,
         post_process_vllm,
     )
@@ -567,6 +596,7 @@ def main():
             aim_config,
             quantized_lora_config,
             fusedops_kernels_config,
+            attention_and_distributed_packing_config,
             exp_metadata,
             post_process_vllm,
         ) = parse_arguments(parser, job_config)
@@ -579,7 +609,7 @@ def main():
             model_args %s, data_args %s, training_args %s, trainer_controller_args %s, \
             tune_config %s, file_logger_config, %s aim_config %s, \
             quantized_lora_config %s, fusedops_kernels_config %s, \
-            exp_metadata %s",
+            attention_and_distributed_packing_config %s exp_metadata %s",
             model_args,
             data_args,
             training_args,
@@ -589,6 +619,7 @@ def main():
             aim_config,
             quantized_lora_config,
             fusedops_kernels_config,
+            attention_and_distributed_packing_config,
             exp_metadata,
         )
     except Exception as e:  # pylint: disable=broad-except
@@ -619,7 +650,7 @@ def main():
     combined_tracker_configs.aim_config = aim_config
 
     try:
-        trainer, num_added_tokens = train(
+        trainer, additional_train_info = train(
             model_args=model_args,
             data_args=data_args,
             train_args=training_args,
@@ -630,6 +661,7 @@ def main():
             exp_metadata=metadata,
             quantized_lora_config=quantized_lora_config,
             fusedops_kernels_config=fusedops_kernels_config,
+            attention_and_distributed_packing_config=attention_and_distributed_packing_config,
         )
     except (MemoryError, OutOfMemoryError) as e:
         logger.error(traceback.format_exc())
@@ -671,19 +703,30 @@ def main():
             )
             sys.exit(INTERNAL_ERROR_EXIT_CODE)
 
-    # post process lora
-    if post_process_vllm and isinstance(tune_config, peft_config.LoraConfig):
+    if isinstance(tune_config, peft_config.LoraConfig):
         try:
-            checkpoint_dir = training_args.save_model_dir
-            if checkpoint_dir:
-                print(f"Post processing LoRA adapters in {checkpoint_dir}")
-                post_process_vLLM_adapters_new_tokens(
-                    path_to_checkpoint=checkpoint_dir, num_added_tokens=num_added_tokens
-                )
+            if training_args.save_model_dir:
+                # Write number of added tokens to artifacts
+                with open(
+                    os.path.join(
+                        training_args.save_model_dir, "added_tokens_info.json"
+                    ),
+                    "w",
+                    encoding="utf-8",
+                ) as f:
+                    json.dump(additional_train_info["added_tokens_info"], f)
+            if training_args.output_dir:
+                # Write number of added tokens to artifacts
+                with open(
+                    os.path.join(training_args.output_dir, "added_tokens_info.json"),
+                    "w",
+                    encoding="utf-8",
+                ) as f:
+                    json.dump(additional_train_info["added_tokens_info"], f)
         except Exception as e:  # pylint: disable=broad-except
             logging.error(traceback.format_exc())
             write_termination_log(
-                f"Exception encountered while lora post-processing model: {e}"
+                f"Exception encountered when saving metadata with model artifacts: {e}"
             )
             sys.exit(INTERNAL_ERROR_EXIT_CODE)
 
