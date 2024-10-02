@@ -64,7 +64,6 @@ from tuning.utils.error_logging import (
     write_termination_log,
 )
 from tuning.utils.logging import set_log_level
-from tuning.utils.merge_model_utils import post_process_vLLM_adapters_new_tokens
 from tuning.utils.preprocessing_utils import (
     format_dataset,
     get_data_collator,
@@ -470,13 +469,6 @@ def get_parser():
     )
 
     parser.add_argument(
-        "--post_process_vllm",
-        type=bool,
-        default=False,
-        help="Bool to indicate if post processing of LoRA adapters for vLLM \
-              is required.",
-    )
-    parser.add_argument(
         "--exp_metadata",
         type=str,
         default=None,
@@ -535,7 +527,6 @@ def parse_arguments(parser, json_config=None):
         ) = parser.parse_dict(json_config, allow_extra_keys=True)
         peft_method = json_config.get("peft_method")
         exp_metadata = json_config.get("exp_metadata")
-        post_process_vllm = json_config.get("post_process_vllm")
     else:
         (
             model_args,
@@ -555,7 +546,6 @@ def parse_arguments(parser, json_config=None):
 
         peft_method = additional.peft_method
         exp_metadata = additional.exp_metadata
-        post_process_vllm = additional.post_process_vllm
 
     if peft_method == "lora":
         tune_config = lora_config
@@ -576,7 +566,6 @@ def parse_arguments(parser, json_config=None):
         fusedops_kernels_config,
         attention_and_distributed_packing_config,
         exp_metadata,
-        post_process_vllm,
     )
 
 
@@ -598,7 +587,6 @@ def main():
             fusedops_kernels_config,
             attention_and_distributed_packing_config,
             exp_metadata,
-            post_process_vllm,
         ) = parse_arguments(parser, job_config)
 
         # Function to set log level for python native logger and transformers training logger

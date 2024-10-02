@@ -188,7 +188,7 @@ ENV SET_NUM_PROCESSES_TO_NUM_GPUS="True"
 WORKDIR /app
 USER ${USER}
 COPY --from=python-installations /home/${USER}/.local /home/${USER}/.local
-COPY --from=cuda-devel /usr/local /home/${USER}/local
+COPY --from=cuda-devel /usr/local /home/${USER}/.local
 ENV PYTHONPATH="/home/${USER}/.local/lib/python${PYTHON_VERSION}/site-packages"
 
 CMD [ "python", "/app/accelerate_launch.py" ]
