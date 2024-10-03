@@ -98,8 +98,6 @@ def main():
     #
     ##########
     output_dir = job_config.get("output_dir")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
     try:
         # checkpoints outputted to tempdir, only final checkpoint copied to output dir
         launch_command(args)
