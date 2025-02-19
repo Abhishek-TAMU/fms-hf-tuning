@@ -11,4 +11,5 @@ datasets:
           batched: false
           fn_kwargs:
             dataset_text_field: "dataset_text_field"
-            dataset_template: "dataset_template"
+            template: "dataset_template"
+            add_eos_token: true
