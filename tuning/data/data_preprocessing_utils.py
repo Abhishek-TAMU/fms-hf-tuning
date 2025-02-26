@@ -13,6 +13,7 @@
 # limitations under the License.
 # Standard
 from typing import Callable, Optional
+import logging
 
 # Third Party
 from transformers import AutoTokenizer, DataCollatorForSeq2Seq
@@ -72,10 +73,15 @@ def get_data_collator(
             response_template_ids = tokenizer.encode(
                 response_template, add_special_tokens=False
             )[2:]
+            logging.warning(
+                "DataCollatorForCompletionOnlyLM is used with padding: %s",
+                is_padding_free,
+            )
             return DataCollatorForCompletionOnlyLM(
                 response_template=response_template_ids,
                 tokenizer=tokenizer,
                 ignore_index=configs.IGNORE_INDEX,
+                padding_free=is_padding_free,
             )
 
         if is_padding_free:
