@@ -21,11 +21,12 @@ fsdp_config:
 
   # setting this to true will increase forward memory by prefetching the next FSDP all-gather, while performing
   # the current forward pass. 
-  fsdp_forward_prefetch: false
+  fsdp_forward_prefetch: true
 
   # setting this will offload model and optimizer parameters to the CPU, to save GPU memory at a significant
   # increase of CPU time.
   fsdp_offload_params: false
+  use_orig_params: true
   
   fsdp_sharding_strategy: 1 # set to FULL_SHARD (1), SHARD_GRAD_OP (2), 
                             # 3 is NO_SHARD, effectively disabling FSDP
