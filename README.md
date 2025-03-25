@@ -46,6 +46,14 @@ pip install fms-hf-tuning[flash-attn]
 ```
 [FlashAttention](https://github.com/Dao-AILab/flash-attention) requires the [CUDA Toolit](https://developer.nvidia.com/cuda-toolkit) to be pre-installed.
 
+*Debug recommendation:* While training, if you encounter flash-attn errors such as `undefined symbol`, you can follow the below steps for clean installation of flash binaries. This may occur when having multiple environments sharing the pip cache directory or torch version is updated.
+
+```
+pip uninstall flash-attn
+pip cache purge
+pip install fms-hf-tuning[flash-attn]
+```
+
 ### Using FMS-Acceleration
 
 If you wish to use [fms-acceleration](https://github.com/foundation-model-stack/fms-acceleration), you need to install it. 
@@ -187,6 +195,19 @@ Here are some scenarios addressed in the flow chart:
 3. There might be special tokens used in chat template which the tokenizer might be unaware of, for example `<|start_of_role|>` which can cause issues during tokenization as it might not be treated as a single token  
 
 
+#### Add Special Tokens
+Working with multi-turn chat data might require the tokenizer to use a few new control tokens ( ex: `<|assistant|>`, `[SYS]` ) as described above in the guidelines. These special tokens might not be present in the tokenizer's vocabulary if the user is using base model.
+
+Users can pass `--add_special_tokens` argument which would add the required tokens to the tokenizer's vocabulary.  
+For example required special tokens used in `--instruction_template`/`--response_template` can be passed as follows:
+
+```
+python -m tuning.sft_trainer \
+...
+--add_special_tokens "<|start_of_role|>" "<|end_of_role|>" \
+--instruction_template "<|start_of_role|>user<|end_of_role|>" \
+--response_template "<|start_of_role|>assistant<|end_of_role|>"
+```
 
 ### 4. Pre tokenized datasets.
 
@@ -201,6 +222,16 @@ python tuning/sft_trainer.py ... --training_data_path twitter_complaints_tokeniz
 ### Advanced data preprocessing.
 
 For advanced data preprocessing support including mixing and custom preprocessing of datasets please see [this document](./docs/advanced-data-preprocessing.md).
+
+## Offline Data Preprocessing
+
+We also provide a script for the user to perform standalone data preprocessing. Our script for standalone data processing decoupled from the `tuning/training` is [offline_data_processing.py](./scripts/offline_data_processing.py). This script is especially useful if:
+
+1. The user is working with a large dataset and wants to perform the processing in one shot and then train the model directly on the processed dataset.
+
+2. The user wants to test out the data preprocessing outcome before training.
+
+Please refer to [this document](docs/offline-data-preprocessing.md) for details on how to use the offline data processing script.
 
 ## Supported Models
 
@@ -791,7 +822,7 @@ Notes:
  * Notes on Fast MoE
     - `--fast_moe` is an integer value that configures the amount of expert parallel sharding (ep_degree).
     - `world_size` must be divisible by the `ep_degree`
-    - Running fast moe modifies the state dict of the model, and must be post-processed using [checkpoint utils](https://github.com/foundation-model-stack/fms-acceleration/blob/main/plugins/accelerated-moe/src/fms_acceleration_moe/utils/checkpoint_utils.py) to run inference (HF, vLLM, etc.).
+    - Running fast moe modifies the state dict of the model, and must be post-processed which happens automatically and the converted checkpoint can be found at `hf_converted_checkpoint` folder within every saved checkpoint directory. Alternatively, we can perform similar option manually through [checkpoint utils](https://github.com/foundation-model-stack/fms-acceleration/blob/main/plugins/accelerated-moe/src/fms_acceleration_moe/utils/checkpoint_utils.py) script.
       - The typical usecase for this script is to run:
         ```
         python -m fms_acceleration_moe.utils.checkpoint_utils \
