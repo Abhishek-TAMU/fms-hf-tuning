@@ -870,6 +870,29 @@ We also have support for extended pre training where users might wanna pretrain 
 We also support full fine-tuning and LoRA tuning for vision language models - `Granite 3.2 Vision`, `Llama 3.2 Vision`, and `LLaVa-Next`. 
 For information on supported dataset formats and how to tune a vision-language model, please see [this document](./docs/vision-language-model-tuning.md).
 
+### Supported vision model
+
+- Legend:
+
+  ✅ Ready and available 
+
+  ✔️ Ready and available - compatible architecture
+
+  🚫 Not supported
+
+  ? May be supported, but not tested
+
+Model Name & Size  | Model Architecture | Full Finetuning |
+-------------------- | ---------------- | --------------- |
+Llama 3.2-11B Vision  | MllamaForConditionalGeneration | ✅* |
+Llava 1.5-7B  | LlavaForConditionalGeneration | ✅* |
+Granite 3.1-2B Vision  | LlavaNextForConditionalGeneration | ✅* |
+Llava Mistral 1.6-7B  | LlavaNextForConditionalGeneration | ✅* |
+
+(*) - Supported with `fms-hf-tuning` v2.8.0 or later.
+
+**Note**: vLLM currently does not support inference with LoRA-tuned vision models. To use a tuned LoRA adapter of vision model, please merge it with the base model before running vLLM inference.
+
 ## Inference
 Currently, we do *not* offer inference support as part of the library, but we provide a standalone script for running inference on tuned models for testing purposes. For a full list of options run `python scripts/run_inference.py --help`. Note that no data formatting / templating is applied at inference time.
 
