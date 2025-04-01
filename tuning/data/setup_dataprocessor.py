@@ -20,13 +20,7 @@ import logging
 from datasets import Dataset, IterableDataset
 
 # Third
-from transformers import (
-    AutoProcessor,
-    AutoTokenizer,
-    LlavaNextProcessor,
-    LlavaProcessor,
-    MllamaProcessor,
-)
+from transformers import AutoProcessor, AutoTokenizer
 
 # Local
 from tuning.config.configs import DataArguments, TrainingArguments
@@ -225,13 +219,12 @@ def _get_default_dataset_handlers(data_args, tokenizer_kwargs):
 
 
 ### Vsion Data Format
-def _get_vision_dataset_handlers(data_args, processor, processor_kwargs):
+def _get_vision_dataset_handlers(data_args, processor_kwargs):
 
     handlers = []
 
     # First data handler configuration
     fn_kwargs1 = {
-        "processor": processor,
         "dataset_text_field": data_args.dataset_text_field,
         "conversation_column": data_args.dataset_text_field,
     }
@@ -246,7 +239,6 @@ def _get_vision_dataset_handlers(data_args, processor, processor_kwargs):
 
     # Second data handler configuration
     fn_kwargs2 = {
-        "processor": processor,
         "fields_name": {
             "dataset_text_field": data_args.dataset_text_field,
             "dataset_image_field": data_args.dataset_image_field,
@@ -285,9 +277,7 @@ def _process_raw_data_args(
     max_seq_length: int,
     additional_data_handlers: Dict[str, DataHandler] = None,
     is_padding_free: bool = False,
-    processor: Union[
-        AutoProcessor, MllamaProcessor, LlavaProcessor, LlavaNextProcessor
-    ] = None,
+    processor: AutoProcessor = None,
 ):
 
     # Create a data processor with default processor config
@@ -296,6 +286,7 @@ def _process_raw_data_args(
     data_processor = get_datapreprocessor(
         processor_config=default_processor_config,
         tokenizer=tokenizer,
+        image_processor=processor,
         additional_data_handlers=additional_data_handlers,
     )
     assert isinstance(
@@ -333,7 +324,7 @@ def _process_raw_data_args(
 
     processor_kwargs = {}
     processor_kwargs["return_tensors"] = "pt"
-    processor_kwargs["padding"] = True
+    processor_kwargs["padding"] = not is_padding_free
 
     handlers = None
     dataset_text_field = None
@@ -347,7 +338,7 @@ def _process_raw_data_args(
     elif data_args.dataset_text_field and data_args.dataset_image_field:
 
         handlers, dataset_text_field = _get_vision_dataset_handlers(
-            data_args, processor, processor_kwargs
+            data_args, processor_kwargs
         )
     elif data_args.instruction_template and data_args.response_template:
         # Data Format 2: Chat dataset with instruction and response template
@@ -393,9 +384,7 @@ def process_dataargs(
     train_args: TrainingArguments,
     additional_data_handlers: Dict[str, DataHandler] = None,
     is_padding_free: bool = False,
-    processor: Union[
-        AutoProcessor, MllamaProcessor, LlavaProcessor, LlavaNextProcessor
-    ] = None,
+    processor: AutoProcessor = None,
 ):
     """
     Args:

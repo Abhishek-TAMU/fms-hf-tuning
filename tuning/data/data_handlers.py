@@ -26,12 +26,10 @@ from jinja2 import StrictUndefined, TemplateSyntaxError, UndefinedError
 from jinja2.sandbox import SandboxedEnvironment, SecurityError
 from PIL import Image
 from transformers import (
-    AutoProcessor,
     AutoTokenizer,
     GPT2TokenizerFast,
     LlavaNextProcessor,
     LlavaProcessor,
-    MllamaProcessor,
 )
 
 # Local
@@ -312,17 +310,21 @@ def apply_tokenizer_chat_template(
 
 def prepare_multimodal_data_processor(
     element: Dict[str, str],
-    processor: AutoProcessor,
     **kwargs,
 ):
     """Function (data handler) to apply processor to multimodal dataset elements.
        Expects to be run as a HF Map API function.
     Args:
         element: the HF Dataset element.
-        processor: The processor instance of AutoProcessor or LlavaProcessor.
     Returns:
         Formatted HF Dataset element by formatting dataset with processor
     """
+
+    processor = kwargs.get("processor", None)
+    if processor is None:
+        raise ValueError(
+            "Processor is missing. Please provide a processor when initializing the handler."
+        )
 
     processor_kwargs = kwargs.get("processor_kwargs", {})
     fields_name = kwargs.get("fields_name", {})
