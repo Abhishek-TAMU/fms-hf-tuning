@@ -41,7 +41,7 @@ pip install fms-hf-tuning
 ### Using FlashAttention
 
 > Note: After installing, if you wish to use [FlashAttention](https://github.com/Dao-AILab/flash-attention), then you need to install these requirements:
-```
+```sh
 pip install fms-hf-tuning[dev]
 pip install fms-hf-tuning[flash-attn]
 ```
@@ -49,7 +49,7 @@ pip install fms-hf-tuning[flash-attn]
 
 *Debug recommendation:* While training, if you encounter flash-attn errors such as `undefined symbol`, you can follow the below steps for clean installation of flash binaries. This may occur when having multiple environments sharing the pip cache directory or torch version is updated.
 
-```
+```sh
 pip uninstall flash-attn
 pip cache purge
 pip install fms-hf-tuning[flash-attn]

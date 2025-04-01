@@ -282,7 +282,6 @@ def apply_tokenizer_chat_template(
         element: the HF Dataset element.
         tokenizer: Tokenizer to be used.
         dataset_text_field: the field in which to store the rendered text.
-        chat_data_key: dataset field where chat template will be applied.
         conversation_column: column name where the chat template expects the conversation
     Returns:
         Formatted HF Dataset element by formatting dataset with tokenizer's chat template
@@ -313,9 +312,7 @@ def apply_tokenizer_chat_template(
 
 def prepare_multimodal_data_processor(
     element: Dict[str, str],
-    processor: Union[
-        AutoProcessor, MllamaProcessor, LlavaProcessor, LlavaNextProcessor
-    ],
+    processor: AutoProcessor,
     **kwargs,
 ):
     """Function (data handler) to apply processor to multimodal dataset elements.
@@ -344,7 +341,7 @@ def prepare_multimodal_data_processor(
     image = try_convert_bytes_dict_to_pil(image)  # Needed for below image processing
 
     # We need to pick first image from the Image list for LlavaProcessor and
-    # LlavaNextProcessor (only Granite-3.2-Vision not Llava Mistral)
+    # LlavaNextProcessor (Granite Vision Model)
     if isinstance(processor, LlavaProcessor) or (
         isinstance(processor, LlavaNextProcessor)
         and isinstance(processor.tokenizer, GPT2TokenizerFast)
